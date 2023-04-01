@@ -1,8 +1,8 @@
 # equity_directory
 Stocks ideas using fundamental and technical analysis
 
---this directory is for a report which will run stocks through a series of filters to produce a daily report.
---the flow will be as follows:
+this directory is for a report which will run stocks through a series of filters to produce a daily report.
+the flow will be as follows:
 
 1. Pull fundamental analysis data on all the stocks in the S&P 500
 
@@ -14,4 +14,4 @@ Produces CSV of "good fundamental companies" (called gfc.csv)
 
 Prodces CSV of "good fundamental companies, that are ALSO 'buy' candidates based on technical analysis"
 
-prodcues csv goodft.csv
+produces csv goodft.csv
