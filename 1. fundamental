@@ -1,0 +1,68 @@
+--this script pulls all stocks in S&P 500 and downloads CSV which includeds metrics based on fundmental analysis. 
+-- measures currently are : "Market Cap", "PE Ratio", "EPS", "Dividend Yield", "Price to Sales Ratio", "Price to Book Ratio", 
+                            "Return on Equity", "Debt to Equity Ratio"
+
+import yfinance as yf
+import csv
+
+# Create a yfinance.Ticker object for the S&P 500 index
+sp500_index = yf.Ticker("^GSPC")
+
+# Get a list of S&P 500 stock symbols
+sp500_history = sp500_index.history(period="max")
+sp500_symbols = ['MMM', 'ABT', 'ABBV', 'ABMD', 'ACN', 'ATVI', 'ADBE', 'AMD', 'AAP', 'AES', 'AFL', 'A', 'APD', 
+                 'AKAM', 'ALK', 'ALB', 'ARE', 'ALGN', 'ALLE', 'LNT', 'ALL', 'GOOGL', 'GOOG', 'MO', 'AMZN', 'AMCR', 
+                 'AEE', 'AAL', 'AEP', 'AXP', 'AIG', 'AMT', 'AWK', 'AMP', 'ABC', 'AME', 'AMGN', 'APH', 'ADI', 'ANSS',
+                 'ANTM', 'AON', 'AOS', 'APA', 'AAPL', 'AMAT', 'APTV', 'ADM', 'ANET', 'AJG', 'AIZ', 'T', 'ATO', 
+                 'ADSK', 'ADP', 'AZO', 'AVB', 'AVY', 'BKR', 'BLL', 'BAC', 'BK', 'BAX', 'BDX', 'BRK.B', 'BBY', 
+                 'BIIB', 'BLK', 'BA', 'BKNG', 'BWA', 'BXP', 'BSX', 'BMY', 'AVGO', 'BR', 'BF.B', 'CHRW', 'COG', 
+                 'CDNS', 'CPB', 'COF', 'CAH', 'KMX', 'CCL', 'CARR', 'CTLT', 'CAT', 'CBOE', 'CBRE', 'CDW', 'CE', 
+                 'CNC', 'CNP', 'CERN', 'CF', 'SCHW', 'CHTR', 'CVX', 'CMG', 'CB', 'CHD', 'CI', 'CINF', 'CTAS', 
+                 'CSCO', 'C', 'CFG', 'CTXS', 'CLX', 'CME', 'CMS', 'KO', 'CTSH', 'CL', 'CMCSA', 'CMA', 'CAG', 
+                 'CXO', 'COP', 'ED', 'STZ', 'COO', 'CPRT', 'GLW', 'CTVA', 'COST', 'COTY', 'CCI', 'CSX', 'CMI',
+                 'CVS', 'DHI', 'DHR', 'DRI', 'DVA', 'DE', 'DAL', 'XRAY', 'DVN', 'DXCM', 'FANG', 'DLR', 'DFS', 
+                 'DISCA', 'DISCK', 'DISH', 'DG', 'DLTR', 'D', 'DPZ', 'DOV', 'DOW', 'DTE', 'DUK', 'DRE', 'DD', 
+                 'DXC', 'EMN', 'ETN', 'EBAY', 'ECL', 'EIX', 'EW', 'EA', 'EMR', 'ENPH', 'ETR', 'EOG', 'EFX', 
+                 'EQIX', 'EQR', 'ESS', 'EL', 'ETSY', 'EVRG', 'ES', 'RE', 'EXC', 'EXPE', 'EXPD', 'EXR', 'XOM', 
+                 'FFIV', 'FB', 'FAST', 'FRT', 'FDX',]
+
+
+
+# Define the fundamental analysis measurements
+measurements = ["Market Cap", "PE Ratio", "EPS", "Dividend Yield",
+                "Price to Sales Ratio", "Price to Book Ratio", 
+                "Return on Equity", "Debt to Equity Ratio"]
+
+# Define the file path where you want to save the CSV file
+file_path = "/Users/ddeely/Desktop/fundamental_analysis.csv"
+
+# Open the CSV file for writing with UTF-8 encoding and Excel dialect
+with open(file_path, "w", newline="", encoding="utf-8") as file:
+    writer = csv.writer(file, dialect="excel")
+
+    # Write the header row
+    writer.writerow(["Symbol"] + measurements)
+
+    # Loop through each stock in the S&P 500 and write its fundamental analysis measurements
+    for i, symbol in enumerate(sp500_symbols):
+        try:
+            stock = yf.Ticker(symbol)
+            market_cap = stock.info["marketCap"]
+            pe_ratio = stock.info["trailingPE"]
+            eps = stock.info["trailingEps"]
+            dividend_yield = stock.info["dividendYield"]
+            price_to_sales = stock.info["priceToSalesTrailing12Months"]
+            price_to_book = stock.info["priceToBook"]
+            roe = stock.info["returnOnEquity"]
+            debt_to_equity = stock.info["debtToEquity"]
+            writer.writerow([symbol, market_cap, pe_ratio, eps, dividend_yield,
+                             price_to_sales, price_to_book, roe, debt_to_equity])
+            
+            # Print progress every 100 symbols
+            if i % 100 == 0:
+                print(f"{i}/{len(sp500_symbols)} symbols processed")
+                
+        except:
+            continue
+
+print(f"CSV file saved to {file_path}")
