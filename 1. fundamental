@@ -1,68 +1,53 @@
 --this script pulls all stocks in S&P 500 and downloads CSV which includeds metrics based on fundmental analysis. 
 -- measures currently are : "Market Cap", "PE Ratio", "EPS", "Dividend Yield", "Price to Sales Ratio", "Price to Book Ratio", 
                             "Return on Equity", "Debt to Equity Ratio"
-
-import yfinance as yf
+import requests
 import csv
+import time
 
-# Create a yfinance.Ticker object for the S&P 500 index
-sp500_index = yf.Ticker("^GSPC")
+# Enter your Alpha Vantage API key
+api_key = "3E67PWR3DB0JW630"
 
-# Get a list of S&P 500 stock symbols
-sp500_history = sp500_index.history(period="max")
-sp500_symbols = ['MMM', 'ABT', 'ABBV', 'ABMD', 'ACN', 'ATVI', 'ADBE', 'AMD', 'AAP', 'AES', 'AFL', 'A', 'APD', 
-                 'AKAM', 'ALK', 'ALB', 'ARE', 'ALGN', 'ALLE', 'LNT', 'ALL', 'GOOGL', 'GOOG', 'MO', 'AMZN', 'AMCR', 
-                 'AEE', 'AAL', 'AEP', 'AXP', 'AIG', 'AMT', 'AWK', 'AMP', 'ABC', 'AME', 'AMGN', 'APH', 'ADI', 'ANSS',
-                 'ANTM', 'AON', 'AOS', 'APA', 'AAPL', 'AMAT', 'APTV', 'ADM', 'ANET', 'AJG', 'AIZ', 'T', 'ATO', 
-                 'ADSK', 'ADP', 'AZO', 'AVB', 'AVY', 'BKR', 'BLL', 'BAC', 'BK', 'BAX', 'BDX', 'BRK.B', 'BBY', 
-                 'BIIB', 'BLK', 'BA', 'BKNG', 'BWA', 'BXP', 'BSX', 'BMY', 'AVGO', 'BR', 'BF.B', 'CHRW', 'COG', 
-                 'CDNS', 'CPB', 'COF', 'CAH', 'KMX', 'CCL', 'CARR', 'CTLT', 'CAT', 'CBOE', 'CBRE', 'CDW', 'CE', 
-                 'CNC', 'CNP', 'CERN', 'CF', 'SCHW', 'CHTR', 'CVX', 'CMG', 'CB', 'CHD', 'CI', 'CINF', 'CTAS', 
-                 'CSCO', 'C', 'CFG', 'CTXS', 'CLX', 'CME', 'CMS', 'KO', 'CTSH', 'CL', 'CMCSA', 'CMA', 'CAG', 
-                 'CXO', 'COP', 'ED', 'STZ', 'COO', 'CPRT', 'GLW', 'CTVA', 'COST', 'COTY', 'CCI', 'CSX', 'CMI',
-                 'CVS', 'DHI', 'DHR', 'DRI', 'DVA', 'DE', 'DAL', 'XRAY', 'DVN', 'DXCM', 'FANG', 'DLR', 'DFS', 
-                 'DISCA', 'DISCK', 'DISH', 'DG', 'DLTR', 'D', 'DPZ', 'DOV', 'DOW', 'DTE', 'DUK', 'DRE', 'DD', 
-                 'DXC', 'EMN', 'ETN', 'EBAY', 'ECL', 'EIX', 'EW', 'EA', 'EMR', 'ENPH', 'ETR', 'EOG', 'EFX', 
-                 'EQIX', 'EQR', 'ESS', 'EL', 'ETSY', 'EVRG', 'ES', 'RE', 'EXC', 'EXPE', 'EXPD', 'EXR', 'XOM', 
-                 'FFIV', 'FB', 'FAST', 'FRT', 'FDX',]
+# Define the list of measurements to extract
+measurements = ["MarketCapitalization", "PERatio", "EPS", "DividendYield",
+                "PriceToSalesRatioTTM", "PriceToBookRatio", "ReturnOnEquityTTM"]
 
+# Define the URL to extract S&P 500 tickers
+url = "https://datahub.io/core/s-and-p-500-companies/r/constituents.csv"
 
+# Extract the S&P 500 tickers from the URL
+response = requests.get(url)
+data = response.content.decode('utf-8').splitlines()
+sp500_tickers = []
+for row in csv.reader(data):
+    sp500_tickers.append(row[0])
 
-# Define the fundamental analysis measurements
-measurements = ["Market Cap", "PE Ratio", "EPS", "Dividend Yield",
-                "Price to Sales Ratio", "Price to Book Ratio", 
-                "Return on Equity", "Debt to Equity Ratio"]
+# Define the function to extract the fundamental data for a given ticker
+def extract_fundamentals(ticker):
+    url = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={api_key}"
+    response = requests.get(url)
+    data = response.json()
+    if not data:
+        print(f"No data available for {ticker}")
+        return []
+    fundamental_data = []
+    for measurement in measurements:
+        if measurement in data:
+            fundamental_data.append(data[measurement])
+        else:
+            print(f"Missing data for {measurement} of {ticker}")
+            fundamental_data.append('')
+    return fundamental_data
 
-# Define the file path where you want to save the CSV file
-file_path = "/Users/ddeely/Desktop/fundamental_analysis.csv"
+# Extract the fundamental data for each S&P 500 ticker
+sp500_fundamentals = []
+for ticker in sp500_tickers:
+    fundamental_data = extract_fundamentals(ticker)
+    sp500_fundamentals.append([ticker] + fundamental_data)
+    time.sleep(15) # Sleep for 15 seconds to avoid hitting API rate limit
 
-# Open the CSV file for writing with UTF-8 encoding and Excel dialect
-with open(file_path, "w", newline="", encoding="utf-8") as file:
-    writer = csv.writer(file, dialect="excel")
-
-    # Write the header row
-    writer.writerow(["Symbol"] + measurements)
-
-    # Loop through each stock in the S&P 500 and write its fundamental analysis measurements
-    for i, symbol in enumerate(sp500_symbols):
-        try:
-            stock = yf.Ticker(symbol)
-            market_cap = stock.info["marketCap"]
-            pe_ratio = stock.info["trailingPE"]
-            eps = stock.info["trailingEps"]
-            dividend_yield = stock.info["dividendYield"]
-            price_to_sales = stock.info["priceToSalesTrailing12Months"]
-            price_to_book = stock.info["priceToBook"]
-            roe = stock.info["returnOnEquity"]
-            debt_to_equity = stock.info["debtToEquity"]
-            writer.writerow([symbol, market_cap, pe_ratio, eps, dividend_yield,
-                             price_to_sales, price_to_book, roe, debt_to_equity])
-            
-            # Print progress every 100 symbols
-            if i % 100 == 0:
-                print(f"{i}/{len(sp500_symbols)} symbols processed")
-                
-        except:
-            continue
-
-print(f"CSV file saved to {file_path}")
+# Save the data to a CSV file
+with open('sp500_fundamentals.csv', 'w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['Ticker'] + measurements)
+    writer.writerows(sp500_fundamentals)
