@@ -1,3 +1,9 @@
+#this pulls the top 20 posts from wall street bets over the last 100 days
+#scrapes them for mentions of stock tickers, and counts the mentions per ticker
+#assigns them a sentiment score based on the language surrounding them
+#orders them by most mentions or highest scores
+#fires that list to my email
+
 import praw
 import re
 from datetime import datetime, timedelta
