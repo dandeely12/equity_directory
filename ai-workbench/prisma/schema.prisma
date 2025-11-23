@@ -1,0 +1,99 @@
+// Prisma schema for AI Workbench
+// Stores flows, profiles, and run logs
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Model Profiles
+// Saved presets for models with system prompts and settings
+model Profile {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String?
+  modelId      String
+  systemPrompt String
+  settings     String   // JSON stringified ModelSettings
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Flow Definitions
+// DB-backed flows to eliminate file explosion
+model Flow {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  description    String
+  steps          String   // JSON stringified FlowStep[]
+  inputVariables String   // JSON stringified string[]
+  outputVariable String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  runs           FlowRun[]
+}
+
+// Flow Run Records
+// Tracks execution history of flows
+model FlowRun {
+  id          String   @id @default(uuid())
+  flowId      String
+  flow        Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flowName    String
+  status      String   // 'running' | 'completed' | 'failed'
+  startTime   DateTime
+  endTime     DateTime?
+  durationMs  Int?
+  inputs      String   // JSON stringified
+  outputs     String   // JSON stringified
+  steps       String   // JSON stringified FlowStepRun[]
+  error       String?
+  totalTokens Int?
+  totalCost   Float?
+  createdAt   DateTime @default(now())
+}
+
+// Chat Run Records
+// Tracks individual chat interactions
+model ChatRun {
+  id               String   @id @default(uuid())
+  mode             String   // 'direct' | 'vector_rag'
+  userMessage      String
+  assistantMessage String
+  modelCall        String   // JSON stringified ModelCallLog
+  vectorSearch     String?  // JSON stringified VectorSearchLog
+  toolCalls        String   // JSON stringified ToolCall[]
+  events           String   // JSON stringified RunEvent[]
+  startTime        DateTime
+  endTime          DateTime
+  durationMs       Int
+  totalTokens      Int
+  totalCost        Float
+  error            String?
+  createdAt        DateTime @default(now())
+}
+
+// Document Metadata
+// Tracks uploaded documents (metadata only, vectors in Qdrant)
+model Document {
+  id             String   @id @default(uuid())
+  fileName       String
+  title          String
+  collectionName String
+  metadata       String   // JSON stringified DocumentMetadata
+  totalChunks    Int
+  uploadedAt     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// System Configuration
+// App-level settings and state
+model Config {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
