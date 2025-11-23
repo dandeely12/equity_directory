@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import RunHistory from './RunHistory';
 
 interface MainPanelProps {
   onRunSelected: (runId: string) => void;
 }
 
-type Tab = 'chat' | 'flows';
+type Tab = 'chat' | 'flows' | 'history';
 
 export default function MainPanel({ onRunSelected }: MainPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('chat');
@@ -49,6 +50,16 @@ export default function MainPanel({ onRunSelected }: MainPanelProps) {
             }`}
           >
             Flows
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2 font-medium text-sm border-b-2 transition ${
+              activeTab === 'history'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            History
           </button>
         </div>
       </div>
@@ -106,6 +117,8 @@ export default function MainPanel({ onRunSelected }: MainPanelProps) {
               </div>
             </div>
           </div>
+        ) : activeTab === 'history' ? (
+          <RunHistory onSelectRun={onRunSelected} />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
             <div className="text-center">
