@@ -1,14 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ModelDefinition, ModelSettings, DEFAULT_MODEL_SETTINGS } from '@/types';
+import { ModelDefinition, ModelSettings } from '@/types';
 
-export default function LeftSidebar() {
+interface LeftSidebarProps {
+  selectedModel: string;
+  onModelChange: (modelId: string) => void;
+  settings: ModelSettings;
+  onSettingsChange: (settings: ModelSettings) => void;
+  systemPrompt: string;
+  onSystemPromptChange: (prompt: string) => void;
+}
+
+export default function LeftSidebar({
+  selectedModel,
+  onModelChange,
+  settings,
+  onSettingsChange,
+  systemPrompt,
+  onSystemPromptChange,
+}: LeftSidebarProps) {
   const [models, setModels] = useState<ModelDefinition[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [selectedModel, setSelectedModel] = useState('');
-  const [settings, setSettings] = useState<ModelSettings>(DEFAULT_MODEL_SETTINGS);
-  const [systemPrompt, setSystemPrompt] = useState('');
   const [showSaveProfile, setShowSaveProfile] = useState(false);
   const [profileName, setProfileName] = useState('');
 
@@ -24,7 +37,7 @@ export default function LeftSidebar() {
       if (data.success) {
         setModels(data.data.all);
         if (data.data.all.length > 0 && !selectedModel) {
-          setSelectedModel(data.data.all[0].id);
+          onModelChange(data.data.all[0].id);
         }
       }
     } catch (error) {
@@ -70,10 +83,10 @@ export default function LeftSidebar() {
     }
   };
 
-  const loadProfile = async (profile: any) => {
-    setSelectedModel(profile.modelId);
-    setSystemPrompt(profile.systemPrompt);
-    setSettings(profile.settings);
+  const loadProfile = (profile: any) => {
+    onModelChange(profile.modelId);
+    onSystemPromptChange(profile.systemPrompt);
+    onSettingsChange(profile.settings);
   };
 
   const deleteProfile = async (id: string) => {
@@ -110,7 +123,7 @@ export default function LeftSidebar() {
         </label>
         <select
           value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
+          onChange={(e) => onModelChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
         >
           <option value="">Select a model...</option>
@@ -138,7 +151,7 @@ export default function LeftSidebar() {
           max="2"
           step="0.1"
           value={settings.temperature}
-          onChange={(e) => setSettings({ ...settings, temperature: parseFloat(e.target.value) })}
+          onChange={(e) => onSettingsChange({ ...settings, temperature: parseFloat(e.target.value) })}
           className="w-full"
         />
         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -154,7 +167,7 @@ export default function LeftSidebar() {
         <input
           type="number"
           value={settings.maxTokens}
-          onChange={(e) => setSettings({ ...settings, maxTokens: parseInt(e.target.value) })}
+          onChange={(e) => onSettingsChange({ ...settings, maxTokens: parseInt(e.target.value) })}
           min="100"
           max="8192"
           step="100"
@@ -170,7 +183,7 @@ export default function LeftSidebar() {
         <textarea
           rows={4}
           value={systemPrompt}
-          onChange={(e) => setSystemPrompt(e.target.value)}
+          onChange={(e) => onSystemPromptChange(e.target.value)}
           placeholder="Enter system prompt..."
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
         />
@@ -210,7 +223,8 @@ export default function LeftSidebar() {
         ) : (
           <button
             onClick={() => setShowSaveProfile(true)}
-            className="w-full px-3 py-2 text-sm border border-dashed border-gray-300 dark:border-gray-600 rounded-md text-gray-600 dark:text-gray-400 hover:border-blue-500 hover:text-blue-500 transition mb-2"
+            disabled={!selectedModel}
+            className="w-full px-3 py-2 text-sm border border-dashed border-gray-300 dark:border-gray-600 rounded-md text-gray-600 dark:text-gray-400 hover:border-blue-500 hover:text-blue-500 transition mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             + Save Current as Profile
           </button>

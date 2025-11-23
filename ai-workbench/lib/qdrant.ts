@@ -56,10 +56,22 @@ export async function getCollectionInfo(collectionName: string): Promise<QdrantC
   try {
     const info = await client.getCollection(collectionName);
 
+    // Handle both simple and complex vector config structures
+    const vectors = info.config?.params?.vectors;
+    let vectorSize = 0;
+    let distance: 'Cosine' | 'Euclid' | 'Dot' = 'Cosine';
+
+    if (typeof vectors === 'number') {
+      vectorSize = vectors;
+    } else if (vectors && typeof vectors === 'object') {
+      vectorSize = typeof vectors.size === 'number' ? vectors.size : 0;
+      distance = vectors.distance as 'Cosine' | 'Euclid' | 'Dot';
+    }
+
     return {
       name: collectionName,
-      vectorSize: info.config.params.vectors.size || 0,
-      distance: info.config.params.vectors.distance as 'Cosine' | 'Euclid' | 'Dot',
+      vectorSize,
+      distance,
       pointsCount: info.points_count || 0,
       status: info.status as 'green' | 'yellow' | 'red',
     };
