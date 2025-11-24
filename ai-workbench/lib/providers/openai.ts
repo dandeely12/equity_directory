@@ -1,6 +1,6 @@
 /**
  * OpenAI Provider
- * Handles GPT API calls
+ * Handles GPT API calls with function calling support
  */
 
 import OpenAI from 'openai';
@@ -11,6 +11,12 @@ export interface OpenAICallParams {
   systemPrompt?: string;
   prompt: string;
   settings: ModelSettings;
+  tools?: any[]; // OpenAI tool definitions
+  toolChoice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } };
+  responseFormat?: { type: 'text' | 'json_object' };
+  seed?: number;
+  logprobs?: boolean;
+  topLogprobs?: number;
 }
 
 export async function callOpenAI(
@@ -33,7 +39,7 @@ export async function callOpenAI(
 
     messages.push({ role: 'user', content: params.prompt });
 
-    const response = await client.chat.completions.create({
+    const requestParams: any = {
       model: params.modelId,
       messages,
       max_tokens: params.settings.maxTokens,
@@ -42,12 +48,46 @@ export async function callOpenAI(
       frequency_penalty: params.settings.frequencyPenalty || 0,
       presence_penalty: params.settings.presencePenalty || 0,
       stop: params.settings.stopSequences,
-    });
+    };
+
+    // Add tools if provided
+    if (params.tools && params.tools.length > 0) {
+      requestParams.tools = params.tools;
+      requestParams.tool_choice = params.toolChoice || 'auto';
+    }
+
+    // Add response format (JSON mode)
+    if (params.responseFormat) {
+      requestParams.response_format = params.responseFormat;
+    }
+
+    // Add seed for reproducibility
+    if (params.seed !== undefined) {
+      requestParams.seed = params.seed;
+    }
+
+    // Add logprobs
+    if (params.logprobs) {
+      requestParams.logprobs = true;
+      if (params.topLogprobs) {
+        requestParams.top_logprobs = params.topLogprobs;
+      }
+    }
+
+    const response = await client.chat.completions.create(requestParams);
 
     const endTime = Date.now();
     const durationMs = endTime - startTime;
 
-    const responseText = response.choices[0]?.message?.content || '';
+    const responseMessage = response.choices[0]?.message;
+    const responseText = responseMessage?.content || '';
+
+    // Extract tool calls if present
+    const toolCalls = responseMessage?.tool_calls?.map((tc) => ({
+      id: tc.id,
+      name: tc.function.name,
+      arguments: JSON.parse(tc.function.arguments),
+    }));
 
     return {
       modelId: params.modelId,
@@ -66,6 +106,8 @@ export async function callOpenAI(
         totalTokens: response.usage?.total_tokens || 0,
       },
       durationMs,
+      toolCalls: toolCalls || undefined,
+      logprobs: response.choices[0]?.logprobs || undefined,
     };
   } catch (error) {
     throw new Error(`OpenAI API error: ${error instanceof Error ? error.message : 'Unknown error'}`);

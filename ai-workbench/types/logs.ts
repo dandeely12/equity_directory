@@ -63,6 +63,13 @@ export interface ModelCallLog {
   cost?: number;
   durationMs: number;
   cached?: boolean;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, any>;
+  }>;
+  logprobs?: any; // OpenAI logprobs data
+  thinking?: string; // Claude extended thinking
 }
 
 /**
