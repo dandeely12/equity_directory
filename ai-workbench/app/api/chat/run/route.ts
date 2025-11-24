@@ -12,16 +12,31 @@ import { calculateCost } from '@/lib/config/models';
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json();
     const {
       message,
+      messages,
       modelId,
+      model,
       systemPrompt,
       mode = 'direct',
       collectionName,
       settings = DEFAULT_MODEL_SETTINGS,
-    } = await request.json();
+    } = body;
 
-    if (!message || !modelId) {
+    // Support both formats: message or messages array
+    const finalModelId = modelId || model;
+    let userMessage = message;
+
+    if (!userMessage && messages && Array.isArray(messages)) {
+      // Extract message from messages array (OpenAI format)
+      const userMsg = messages.find((m: any) => m.role === 'user');
+      if (userMsg) {
+        userMessage = userMsg.content;
+      }
+    }
+
+    if (!userMessage || !finalModelId) {
       return NextResponse.json(
         { success: false, error: 'Message and model ID are required' },
         { status: 400 }
@@ -30,12 +45,12 @@ export async function POST(request: NextRequest) {
 
     const startTime = new Date();
     let vectorSearchLog = null;
-    let finalPrompt = message;
+    let finalPrompt = userMessage;
 
     // If RAG mode, perform vector search first
     if (mode === 'vector_rag' && collectionName) {
       vectorSearchLog = await vectorSearchTool({
-        query: message,
+        query: userMessage,
         collectionName,
         limit: 5,
         scoreThreshold: 0.7,
@@ -47,12 +62,12 @@ export async function POST(request: NextRequest) {
         .join('\n\n');
 
       // Augment prompt with context
-      finalPrompt = `Context from knowledge base:\n\n${context}\n\n---\n\nUser question: ${message}`;
+      finalPrompt = `Context from knowledge base:\n\n${context}\n\n---\n\nUser question: ${userMessage}`;
     }
 
     // Call the model
     const modelCall = await callModel({
-      modelId,
+      modelId: finalModelId,
       systemPrompt,
       prompt: finalPrompt,
       settings,
@@ -63,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate cost
     const cost = calculateCost(
-      modelId,
+      finalModelId,
       modelCall.usage.promptTokens,
       modelCall.usage.completionTokens
     );
@@ -72,7 +87,7 @@ export async function POST(request: NextRequest) {
     const chatRun = await prisma.chatRun.create({
       data: {
         mode,
-        userMessage: message,
+        userMessage,
         assistantMessage: modelCall.response,
         modelCall: stringifyJson(modelCall),
         vectorSearch: vectorSearchLog ? stringifyJson(vectorSearchLog) : null,
@@ -88,14 +103,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        runId: chatRun.id,
-        message: modelCall.response,
-        usage: modelCall.usage,
-        cost,
-        durationMs,
-        vectorSearch: vectorSearchLog,
-      },
+      logId: chatRun.id,
+      runId: chatRun.id,
+      response: modelCall.response,
+      message: modelCall.response,
+      inputTokens: modelCall.usage.promptTokens,
+      outputTokens: modelCall.usage.completionTokens,
+      totalTokens: modelCall.usage.totalTokens,
+      usage: modelCall.usage,
+      cost,
+      durationMs,
+      vectorSearch: vectorSearchLog,
     });
   } catch (error) {
     console.error('Error running chat:', error);

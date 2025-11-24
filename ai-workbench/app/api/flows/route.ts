@@ -48,15 +48,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, description, steps, inputVariables, outputVariable } =
-      await request.json();
+    const body = await request.json();
+    const name = body.name;
+    const description = body.description || 'No description provided';
+    const steps = body.steps;
+    const inputVariables = body.inputVariables || {};
+    const outputVariable = body.outputVariable || 'result';
 
     // Validate required fields
-    if (!name || !description || !steps || !inputVariables || !outputVariable) {
+    if (!name || !steps) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Name, description, steps, inputVariables, and outputVariable are required',
+          error: 'Name and steps are required',
         },
         { status: 400 }
       );
@@ -93,19 +97,19 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    const flowData = {
       success: true,
-      data: {
-        id: flow.id,
-        name: flow.name,
-        description: flow.description,
-        steps: JSON.parse(flow.steps),
-        inputVariables: JSON.parse(flow.inputVariables),
-        outputVariable: flow.outputVariable,
-        createdAt: flow.createdAt,
-        updatedAt: flow.updatedAt,
-      },
-    });
+      id: flow.id,
+      name: flow.name,
+      description: flow.description,
+      steps: JSON.parse(flow.steps),
+      inputVariables: JSON.parse(flow.inputVariables),
+      outputVariable: flow.outputVariable,
+      createdAt: flow.createdAt,
+      updatedAt: flow.updatedAt,
+    };
+
+    return NextResponse.json(flowData);
   } catch (error) {
     console.error('Error creating flow:', error);
     return NextResponse.json(

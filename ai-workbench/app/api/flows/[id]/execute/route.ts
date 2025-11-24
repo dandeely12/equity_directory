@@ -8,7 +8,7 @@ import { executeFlow, getFlowById } from '@/lib/flows/engine';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { inputs } = await request.json();
@@ -21,7 +21,8 @@ export async function POST(
     }
 
     // Get flow definition
-    const flow = await getFlowById(params.id);
+    const { id } = await params;
+    const flow = await getFlowById(id);
 
     if (!flow) {
       return NextResponse.json(

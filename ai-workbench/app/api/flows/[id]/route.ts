@@ -10,11 +10,12 @@ import { prisma, stringifyJson } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const flow = await prisma.flow.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         runs: {
           orderBy: { startTime: 'desc' },
@@ -67,15 +68,16 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { name, description, steps, inputVariables, outputVariable } =
       await request.json();
 
     // Check if flow exists
+    const { id } = await params;
     const existing = await prisma.flow.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -101,7 +103,7 @@ export async function PUT(
 
     // Update flow
     const flow = await prisma.flow.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: name || existing.name,
         description: description || existing.description,
@@ -140,12 +142,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check if flow exists
+    const { id } = await params;
     const flow = await prisma.flow.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!flow) {
@@ -157,7 +160,7 @@ export async function DELETE(
 
     // Delete flow (cascade will delete associated runs)
     await prisma.flow.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({
