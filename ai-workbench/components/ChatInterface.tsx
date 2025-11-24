@@ -26,8 +26,10 @@ export default function ChatInterface({
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [ragMode, setRagMode] = useState(false);
+  const [streamMode, setStreamMode] = useState(true);
   const [selectedCollection, setSelectedCollection] = useState('');
   const [collections, setCollections] = useState<any[]>([]);
+  const [streamingContent, setStreamingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,12 +53,88 @@ export default function ChatInterface({
     }
   };
 
-  const handleSend = async () => {
-    if (!inputMessage.trim() || !selectedModel) return;
+  const handleSendStreaming = async (userMessage: string) => {
+    setLoading(true);
+    setStreamingContent('');
 
-    const userMessage = inputMessage.trim();
-    setInputMessage('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    try {
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          modelId: selectedModel,
+          systemPrompt,
+          mode: ragMode ? 'vector_rag' : 'direct',
+          collectionName: ragMode ? selectedCollection : undefined,
+          settings: modelSettings,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error('Failed to start streaming');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+      let runId: string | undefined;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'chunk') {
+                accumulatedContent += data.content;
+                setStreamingContent(accumulatedContent);
+              } else if (data.type === 'done') {
+                runId = data.data.runId;
+              } else if (data.type === 'error') {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              // Ignore JSON parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+
+      // Add final message
+      if (accumulatedContent) {
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: accumulatedContent,
+            runId,
+          },
+        ]);
+      }
+      setStreamingContent('');
+    } catch (error) {
+      console.error('Error streaming message:', error);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ]);
+      setStreamingContent('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendRegular = async (userMessage: string) => {
     setLoading(true);
 
     try {
@@ -107,11 +185,37 @@ export default function ChatInterface({
     }
   };
 
+  const handleSend = async () => {
+    if (!inputMessage.trim() || !selectedModel) return;
+
+    const userMessage = inputMessage.trim();
+    setInputMessage('');
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+
+    if (streamMode) {
+      await handleSendStreaming(userMessage);
+    } else {
+      await handleSendRegular(userMessage);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Chat Controls */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 flex-wrap gap-y-2">
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={streamMode}
+              onChange={(e) => setStreamMode(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Streaming
+            </span>
+          </label>
+
           <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="checkbox"
@@ -187,6 +291,16 @@ export default function ChatInterface({
                 </div>
               </div>
             ))}
+            {streamingContent && (
+              <div className="flex justify-start">
+                <div className="max-w-3xl">
+                  <div className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <p className="whitespace-pre-wrap">{streamingContent}</p>
+                    <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1"></span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </>
         )}

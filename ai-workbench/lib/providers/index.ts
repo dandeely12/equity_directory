@@ -5,9 +5,9 @@
 
 import { ModelSettings, ModelCallLog } from '@/types';
 import { getModelById } from '@/lib/config/models';
-import { callAnthropic } from './anthropic';
-import { callOpenAI } from './openai';
-import { callLocal } from './local';
+import { callAnthropic, streamAnthropic } from './anthropic';
+import { callOpenAI, streamOpenAI } from './openai';
+import { callLocal, streamLocal } from './local';
 
 export interface CallModelParams {
   modelId: string;
@@ -41,6 +41,33 @@ export async function callModel(params: CallModelParams): Promise<ModelCallLog> 
   }
 }
 
-export { callAnthropic } from './anthropic';
-export { callOpenAI } from './openai';
-export { callLocal } from './local';
+/**
+ * Stream any model by routing to the appropriate provider
+ */
+export async function* streamModel(
+  params: CallModelParams
+): AsyncGenerator<string, ModelCallLog, undefined> {
+  const model = getModelById(params.modelId);
+
+  if (!model) {
+    throw new Error(`Model not found: ${params.modelId}`);
+  }
+
+  switch (model.provider) {
+    case 'anthropic':
+      return yield* streamAnthropic(params);
+
+    case 'openai':
+      return yield* streamOpenAI(params);
+
+    case 'local':
+      return yield* streamLocal(params);
+
+    default:
+      throw new Error(`Unsupported provider: ${model.provider}`);
+  }
+}
+
+export { callAnthropic, streamAnthropic } from './anthropic';
+export { callOpenAI, streamOpenAI } from './openai';
+export { callLocal, streamLocal } from './local';
