@@ -32,6 +32,21 @@ export const EMBEDDING_CONFIGS: Record<string, EmbeddingConfig> = {
     model: 'text-embedding-ada-002',
     dimensions: 1536,
   },
+  'local-nomic': {
+    provider: 'local',
+    model: 'nomic-embed-text',
+    dimensions: 768,
+  },
+  'local-mxbai': {
+    provider: 'local',
+    model: 'mxbai-embed-large',
+    dimensions: 1024,
+  },
+  'local-all-minilm': {
+    provider: 'local',
+    model: 'all-minilm',
+    dimensions: 384,
+  },
 };
 
 /**
@@ -68,15 +83,42 @@ async function generateOpenAIEmbedding(
 }
 
 /**
- * Generate embeddings using local model
- * Placeholder for future implementation
+ * Generate embeddings using local model (Ollama)
+ * Ollama API compatible with OpenAI embeddings endpoint
  */
 async function generateLocalEmbedding(
   text: string,
   model: string
 ): Promise<number[]> {
-  // TODO: Implement local embeddings (e.g., using sentence-transformers via API)
-  throw new Error('Local embeddings not yet implemented');
+  const baseUrl = process.env.LOCAL_LLM_BASE_URL || 'http://localhost:11434';
+
+  try {
+    // Use Ollama's embeddings API
+    const response = await fetch(`${baseUrl}/api/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model || 'nomic-embed-text',
+        prompt: text,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.embedding) {
+      throw new Error('No embedding returned from Ollama');
+    }
+
+    return data.embedding;
+  } catch (error) {
+    throw new Error(`Local embedding error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 /**

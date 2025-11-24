@@ -7,6 +7,7 @@ export * from './models';
 export * from './documents';
 export * from './flows';
 export * from './logs';
+export * from './tools';
 
 /**
  * Common utility types

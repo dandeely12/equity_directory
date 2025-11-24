@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import RunHistory from './RunHistory';
 import ChatInterface from './ChatInterface';
+import FlowInterface from './FlowInterface';
 import { ModelSettings } from '@/types';
 
 interface MainPanelProps {
@@ -72,12 +73,7 @@ export default function MainPanel({
         ) : activeTab === 'history' ? (
           <RunHistory onSelectRun={onRunSelected} />
         ) : (
-          <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
-            <div className="text-center">
-              <p className="text-lg font-medium">Flows</p>
-              <p className="text-sm mt-1">Flow builder coming soon</p>
-            </div>
-          </div>
+          <FlowInterface onRunSelected={onRunSelected} />
         )}
       </div>
     </div>

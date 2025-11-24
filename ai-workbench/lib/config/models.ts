@@ -7,11 +7,22 @@ import { ModelDefinition, ModelProviderConfig } from '@/types';
 
 /**
  * Anthropic Models
+ * Pricing updated as of January 2025
  */
 export const ANTHROPIC_MODELS: ModelDefinition[] = [
   {
     id: 'claude-3-5-sonnet-20241022',
-    name: 'Claude 3.5 Sonnet',
+    name: 'Claude 3.5 Sonnet (v2)',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    maxTokens: 8192,
+    supportsStreaming: true,
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+  },
+  {
+    id: 'claude-3-5-sonnet-20240620',
+    name: 'Claude 3.5 Sonnet (v1)',
     provider: 'anthropic',
     contextWindow: 200000,
     maxTokens: 8192,
@@ -30,6 +41,16 @@ export const ANTHROPIC_MODELS: ModelDefinition[] = [
     costPer1kOutput: 0.075,
   },
   {
+    id: 'claude-3-sonnet-20240229',
+    name: 'Claude 3 Sonnet',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    maxTokens: 4096,
+    supportsStreaming: true,
+    costPer1kInput: 0.003,
+    costPer1kOutput: 0.015,
+  },
+  {
     id: 'claude-3-haiku-20240307',
     name: 'Claude 3 Haiku',
     provider: 'anthropic',
@@ -43,10 +64,31 @@ export const ANTHROPIC_MODELS: ModelDefinition[] = [
 
 /**
  * OpenAI Models
+ * Pricing updated as of January 2025
  */
 export const OPENAI_MODELS: ModelDefinition[] = [
   {
-    id: 'gpt-4-turbo-preview',
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    provider: 'openai',
+    contextWindow: 128000,
+    maxTokens: 16384,
+    supportsStreaming: true,
+    costPer1kInput: 0.0025,
+    costPer1kOutput: 0.01,
+  },
+  {
+    id: 'gpt-4o-mini',
+    name: 'GPT-4o Mini',
+    provider: 'openai',
+    contextWindow: 128000,
+    maxTokens: 16384,
+    supportsStreaming: true,
+    costPer1kInput: 0.00015,
+    costPer1kOutput: 0.0006,
+  },
+  {
+    id: 'gpt-4-turbo',
     name: 'GPT-4 Turbo',
     provider: 'openai',
     contextWindow: 128000,
