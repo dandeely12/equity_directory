@@ -11,6 +11,7 @@ import {
   ModelCallStep,
   VectorSearchStep,
   DocumentReadStep,
+  BranchStep,
 } from '@/types/flows';
 import { callModel } from '@/lib/providers';
 import { vectorSearchTool } from '@/lib/tools';
@@ -49,6 +50,78 @@ function substituteVariables(
   });
 
   return result;
+}
+
+/**
+ * Evaluate a condition expression
+ * Supports simple comparisons: ==, !=, >, <, >=, <=, contains, !contains
+ * Examples: "{{status}} == 'success'", "{{count}} > 5", "{{text}} contains 'error'"
+ */
+function evaluateCondition(
+  condition: string,
+  variables: Record<string, any>
+): boolean {
+  // Substitute variables first
+  let expr = condition;
+
+  // Replace {{variable}} with actual values
+  const regex = /\{\{(\w+)\}\}/g;
+  const matches = [...expr.matchAll(regex)];
+
+  for (const match of matches) {
+    const varName = match[1];
+    const value = variables[varName];
+
+    // Convert to string representation for comparison
+    let stringValue: string;
+    if (typeof value === 'string') {
+      stringValue = `'${value}'`; // Wrap strings in quotes
+    } else if (value === null || value === undefined) {
+      stringValue = 'null';
+    } else if (typeof value === 'boolean') {
+      stringValue = String(value);
+    } else if (typeof value === 'number') {
+      stringValue = String(value);
+    } else {
+      stringValue = `'${JSON.stringify(value)}'`;
+    }
+
+    expr = expr.replace(match[0], stringValue);
+  }
+
+  // Handle 'contains' operator
+  if (expr.includes(' contains ')) {
+    const [left, right] = expr.split(' contains ').map(s => s.trim());
+    const leftVal = left.replace(/^'|'$/g, '');
+    const rightVal = right.replace(/^'|'$/g, '');
+    return leftVal.includes(rightVal);
+  }
+
+  // Handle '!contains' operator
+  if (expr.includes(' !contains ')) {
+    const [left, right] = expr.split(' !contains ').map(s => s.trim());
+    const leftVal = left.replace(/^'|'$/g, '');
+    const rightVal = right.replace(/^'|'$/g, '');
+    return !leftVal.includes(rightVal);
+  }
+
+  // Handle comparison operators
+  try {
+    // Use Function constructor to safely evaluate the expression
+    // Only allow specific operators
+    const allowedPattern = /^[a-zA-Z0-9_'"\s\.\+\-\*\/\(\)]+([=!<>]{1,2})[a-zA-Z0-9_'"\s\.\+\-\*\/\(\)]+$/;
+
+    if (!allowedPattern.test(expr)) {
+      throw new Error(`Invalid condition expression: ${condition}`);
+    }
+
+    // Evaluate the expression
+    const result = new Function(`return ${expr}`)();
+    return Boolean(result);
+  } catch (error) {
+    console.error('Error evaluating condition:', expr, error);
+    return false;
+  }
 }
 
 /**
@@ -149,6 +222,56 @@ async function executeDocumentReadStep(
 }
 
 /**
+ * Execute a branch step (conditional logic)
+ * Note: Branch steps don't have an outputVariable - they execute sub-steps
+ * which set their own output variables
+ */
+async function executeBranchStep(
+  step: BranchStep,
+  variables: Record<string, any>
+): Promise<{ output: any; metadata: any; executedSteps: FlowStepRun[] }> {
+  const conditionResult = evaluateCondition(step.condition, variables);
+  const selectedBranch = conditionResult ? step.trueBranch : step.falseBranch;
+
+  const executedSteps: FlowStepRun[] = [];
+  let totalTokens = 0;
+  let totalCost = 0;
+
+  // Execute all steps in the selected branch
+  for (const branchStep of selectedBranch) {
+    const stepRun = await executeStep(branchStep, variables);
+    executedSteps.push(stepRun);
+
+    // If step failed, stop branch execution
+    if (stepRun.error) {
+      throw new Error(`Branch step "${branchStep.name}" failed: ${stepRun.error}`);
+    }
+
+    // Update variables with step output
+    Object.assign(variables, stepRun.outputs);
+
+    // Accumulate metrics
+    if (stepRun.metadata?.tokensUsed) {
+      totalTokens += stepRun.metadata.tokensUsed;
+    }
+    if (stepRun.metadata?.cost) {
+      totalCost += stepRun.metadata.cost;
+    }
+  }
+
+  return {
+    output: { branchTaken: conditionResult ? 'true' : 'false' },
+    metadata: {
+      conditionResult,
+      stepsExecuted: executedSteps.length,
+      tokensUsed: totalTokens,
+      cost: totalCost,
+    },
+    executedSteps,
+  };
+}
+
+/**
  * Execute a single flow step
  */
 async function executeStep(
@@ -160,6 +283,7 @@ async function executeStep(
 
   try {
     let result: { output: any; metadata: any };
+    let branchExecutedSteps: FlowStepRun[] = [];
 
     switch (step.type) {
       case 'model_call':
@@ -175,7 +299,10 @@ async function executeStep(
         break;
 
       case 'branch':
-        throw new Error('Branch steps are not yet implemented');
+        const branchResult = await executeBranchStep(step as BranchStep, variables);
+        result = { output: branchResult.output, metadata: branchResult.metadata };
+        branchExecutedSteps = branchResult.executedSteps;
+        break;
 
       default:
         throw new Error(`Unknown step type: ${(step as any).type}`);
@@ -184,7 +311,12 @@ async function executeStep(
     const endTime = new Date();
     const durationMs = endTime.getTime() - startTime.getTime();
 
-    return {
+    // Branch steps don't have outputVariable, regular steps do
+    const outputs = step.type === 'branch'
+      ? result.output
+      : { [step.outputVariable]: result.output };
+
+    const stepRun: FlowStepRun = {
       stepId: step.id,
       stepType: step.type,
       stepName: step.name,
@@ -192,9 +324,19 @@ async function executeStep(
       endTime,
       durationMs,
       inputs,
-      outputs: { [step.outputVariable]: result.output },
+      outputs,
       metadata: result.metadata,
     };
+
+    // For branch steps, include executed sub-steps in metadata
+    if (step.type === 'branch' && branchExecutedSteps.length > 0) {
+      stepRun.metadata = {
+        ...stepRun.metadata,
+        branchSteps: branchExecutedSteps,
+      };
+    }
+
+    return stepRun;
   } catch (error) {
     const endTime = new Date();
     const durationMs = endTime.getTime() - startTime.getTime();

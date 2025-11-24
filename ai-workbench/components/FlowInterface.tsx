@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FlowDefinition, FlowRun } from '@/types/flows';
+import FlowEditor, { FlowEditorData } from './FlowEditor';
 
 interface FlowInterfaceProps {
   onRunSelected: (runId: string) => void;
@@ -14,7 +15,7 @@ export default function FlowInterface({ onRunSelected }: FlowInterfaceProps) {
   const [executing, setExecuting] = useState(false);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [lastRun, setLastRun] = useState<FlowRun | null>(null);
-  const [view, setView] = useState<'list' | 'execute'>('list');
+  const [view, setView] = useState<'list' | 'execute' | 'editor'>('list');
 
   useEffect(() => {
     fetchFlows();
@@ -73,6 +74,38 @@ export default function FlowInterface({ onRunSelected }: FlowInterfaceProps) {
     setInputs(initialInputs);
     setLastRun(null);
   };
+
+  const handleSaveFlow = async (flowData: FlowEditorData) => {
+    try {
+      const response = await fetch('/api/flows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(flowData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Flow created successfully!');
+        fetchFlows();
+        setView('list');
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving flow:', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  if (view === 'editor') {
+    return (
+      <FlowEditor
+        onSave={handleSaveFlow}
+        onCancel={() => setView('list')}
+      />
+    );
+  }
 
   if (view === 'execute' && selectedFlow) {
     return (
@@ -228,11 +261,20 @@ export default function FlowInterface({ onRunSelected }: FlowInterfaceProps) {
 
   return (
     <div className="h-full flex flex-col p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Flows</h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          Multi-step workflows for complex AI tasks
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Flows</h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Multi-step workflows for complex AI tasks
+          </p>
+        </div>
+        <button
+          onClick={() => setView('editor')}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center space-x-2"
+        >
+          <span>+</span>
+          <span>Create Flow</span>
+        </button>
       </div>
 
       {loading ? (
@@ -245,9 +287,15 @@ export default function FlowInterface({ onRunSelected }: FlowInterfaceProps) {
             <p className="text-lg font-medium text-gray-600 dark:text-gray-400">
               No flows yet
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-              Create flows via API to get started
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 mb-4">
+              Create your first workflow to get started
             </p>
+            <button
+              onClick={() => setView('editor')}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Create Your First Flow
+            </button>
           </div>
         </div>
       ) : (
