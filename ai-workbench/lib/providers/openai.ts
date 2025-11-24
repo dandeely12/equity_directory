@@ -5,6 +5,7 @@
 
 import OpenAI from 'openai';
 import { ModelSettings, ModelCallLog } from '@/types';
+import { calculateCost } from '@/lib/config/models';
 
 export interface OpenAICallParams {
   modelId: string;
@@ -89,6 +90,10 @@ export async function callOpenAI(
       arguments: JSON.parse(tc.function.arguments),
     }));
 
+    const promptTokens = response.usage?.prompt_tokens || 0;
+    const completionTokens = response.usage?.completion_tokens || 0;
+    const cost = calculateCost(params.modelId, promptTokens, completionTokens);
+
     return {
       modelId: params.modelId,
       provider: 'openai',
@@ -101,10 +106,11 @@ export async function callOpenAI(
         topP: params.settings.topP,
       },
       usage: {
-        promptTokens: response.usage?.prompt_tokens || 0,
-        completionTokens: response.usage?.completion_tokens || 0,
+        promptTokens,
+        completionTokens,
         totalTokens: response.usage?.total_tokens || 0,
       },
+      cost,
       durationMs,
       toolCalls: toolCalls || undefined,
       logprobs: response.choices[0]?.logprobs || undefined,
@@ -170,6 +176,7 @@ export async function* streamOpenAI(
 
     const endTime = Date.now();
     const durationMs = endTime - startTime;
+    const cost = calculateCost(params.modelId, promptTokens, completionTokens);
 
     // Return final metadata
     return {
@@ -188,6 +195,7 @@ export async function* streamOpenAI(
         completionTokens,
         totalTokens: promptTokens + completionTokens,
       },
+      cost,
       durationMs,
     };
   } catch (error) {

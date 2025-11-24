@@ -5,6 +5,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { ModelSettings, ModelCallLog } from '@/types';
+import { calculateCost } from '@/lib/config/models';
 
 export interface AnthropicCallParams {
   modelId: string;
@@ -42,6 +43,10 @@ export async function callAnthropic(
     const content = response.content.find(c => c.type === 'text');
     const responseText = content && content.type === 'text' ? content.text : '';
 
+    const promptTokens = response.usage.input_tokens;
+    const completionTokens = response.usage.output_tokens;
+    const cost = calculateCost(params.modelId, promptTokens, completionTokens);
+
     return {
       modelId: params.modelId,
       provider: 'anthropic',
@@ -54,10 +59,11 @@ export async function callAnthropic(
         topP: params.settings.topP,
       },
       usage: {
-        promptTokens: response.usage.input_tokens,
-        completionTokens: response.usage.output_tokens,
-        totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
       },
+      cost,
       durationMs,
     };
   } catch (error) {
@@ -112,6 +118,7 @@ export async function* streamAnthropic(
 
     const endTime = Date.now();
     const durationMs = endTime - startTime;
+    const cost = calculateCost(params.modelId, promptTokens, completionTokens);
 
     // Return final metadata
     return {
@@ -130,6 +137,7 @@ export async function* streamAnthropic(
         completionTokens,
         totalTokens: promptTokens + completionTokens,
       },
+      cost,
       durationMs,
     };
   } catch (error) {
