@@ -28,7 +28,11 @@ export async function callOpenAI(
     throw new Error('OPENAI_API_KEY not configured');
   }
 
-  const client = new OpenAI({ apiKey });
+  const client = new OpenAI({
+    apiKey,
+    timeout: 60000, // 60 second timeout
+    maxRetries: 2,
+  });
   const startTime = Date.now();
 
   try {
@@ -116,6 +120,7 @@ export async function callOpenAI(
       logprobs: response.choices[0]?.logprobs || undefined,
     };
   } catch (error) {
+    console.error('OpenAI API detailed error:', error);
     throw new Error(`OpenAI API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -132,7 +137,11 @@ export async function* streamOpenAI(
     throw new Error('OPENAI_API_KEY not configured');
   }
 
-  const client = new OpenAI({ apiKey });
+  const client = new OpenAI({
+    apiKey,
+    timeout: 60000, // 60 second timeout
+    maxRetries: 2,
+  });
   const startTime = Date.now();
 
   try {
@@ -199,6 +208,7 @@ export async function* streamOpenAI(
       durationMs,
     };
   } catch (error) {
+    console.error('OpenAI API detailed error:', error);
     throw new Error(`OpenAI API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
